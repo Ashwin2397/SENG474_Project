@@ -2,6 +2,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from nltk.tokenize import RegexpTokenizer
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
+import pandas as pd
 
 class SentimentAnalysisModel:
     def __init__(self, data):
@@ -11,11 +12,23 @@ class SentimentAnalysisModel:
 
         self.vectorizer: CountVectorizer = self.vectorizer()
 
-    def preprocess_data(self):
+    def preprocess_data(self, is_balance_data=True):
         # Drop neutral sentiment
         self.data = self.data[self.data.Sentiment != "neutral"] 
+        
+        if is_balance_data:
+            self.balance_data()
 
         return self
+    
+    def balance_data(self):
+        # Undersampling to balance the data
+        _, neg_count = self.data['Sentiment'].value_counts()
+        pos_data = self.data[self.data['Sentiment'] == 'positive']
+        neg_data = self.data[self.data['Sentiment'] == 'negative']
+
+        pos_under = pos_data.sample(neg_count)
+        self.data = pd.concat([pos_under, neg_data], axis=0)
 
     def train_model(self):
         text_counts = self.vectorizer.fit_transform(self.data['Sentence'])
