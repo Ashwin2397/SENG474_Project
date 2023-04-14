@@ -53,6 +53,7 @@ class PriceDataRetrieverAndPreprocessor:
         self.inject_price_polarity()
         self.inject_start_end_time()
         self.inject_polarity_score()
+        self.convert_timestamp()
         
         self.drop_columns()
 
@@ -75,16 +76,30 @@ class PriceDataRetrieverAndPreprocessor:
         self.df = self.df.rename(columns={'Datetime': 'Start time'})
         self.df['End time'] = self.df.apply(lambda row: row['Start time'] + dt.timedelta(hours=interval_string_to_hours[self.interval]), axis=1)
 
-        self.convert_timestamp()
-
     def convert_timestamp(self):
         self.df['Start time'] = pd.to_numeric(pd.to_datetime(self.df['Start time']))
         self.df['End time'] = pd.to_numeric(pd.to_datetime(self.df['End time']))
 
-
     def inject_polarity_score(self):
-        # TODO: This has to be changed to actually grab the polarity score from the self.polarity_score_df
-        self.df['News polarity at start time'] = self.df.apply(lambda _: random(), axis=1)
+        # Loop through each row in the dataframe
+        for index, row in self.df.iterrows():
+            # Loop through each row in the polarity score dataframe
+            for polarity_index, polarity_row in self.polarity_score_df.iterrows():
+                # If the polarity score is within the range of the start and end time, inject the polarity score into the dataframe
+                if self.time_within_range(polarity_row['created_at_est'], row['Start time'], row['End time']):
+                    self.df.at[index, 'News polarity at start time'] = polarity_row['polarity']
+                    # break
+
+        # Loop through each row in the dataframe and drop the rows that do not have a polarity score
+        for index, row in self.df.iterrows():
+            if pd.isna(row['News polarity at start time']):
+                self.df = self.df.drop(index=index)
+
+    def time_within_range(self, time, start, end):
+        '''
+        Determines if the `time` is within the range of `start` and `end`
+        '''
+        return pd.to_datetime(time) >= pd.to_datetime(start) and pd.to_datetime(time) <= pd.to_datetime(end)
 
     def drop_columns(self):
         self.df = self.df.drop(columns=self.columns_to_drop)
